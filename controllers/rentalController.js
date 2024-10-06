@@ -234,7 +234,12 @@ exports.cancelRental = async (req, res) => {
     }
 };
 
-
+/**
+ *  @desc    confirm a rental
+ *  @route   api/rental/confirm/:id
+ *  @method  PUT
+ *  @access  public
+ */
 // Confirm a rental
 exports.confirmRental = async (req, res) => {
     const rentalId = req.params.id; // Get the rental ID from the URL
@@ -277,7 +282,12 @@ exports.confirmRental = async (req, res) => {
     }
 };
 
-
+/**
+ *  @desc    return rented item
+ *  @route   api/rental/return/:id
+ *  @method  PUT
+ *  @access  public
+ */
 // Return an item
 exports.returnItem = async (req, res) => {
     const rentalId = req.params.id; // Get the rental ID from the URL
