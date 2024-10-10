@@ -5,34 +5,49 @@ const jwt = require("jsonwebtoken");
 const JWT_SECRET = "2003"; // Use a secure key
 
 // User Sign-up
-exports.signup = (req, res) => {
+exports.signup = async (req, res) => {
   const { name, email, password, telephone, address } = req.body;
 
+  // Validate input fields
   if (!name || !email || !password || !telephone || !address) {
     return res.status(400).json({ msg: "Please fill in all fields" });
   }
 
-  // Check if the user already exists
-  con.query("SELECT * FROM users WHERE email = ?", [email], (err, result) => {
-    if (err) return res.status(500).json({ msg: "Database error", err });
+  try {
+    // Check if the user already exists
+    const result = await new Promise((resolve, reject) => {
+      con.query("SELECT * FROM users WHERE email = ?", [email], (err, result) => {
+        if (err) return reject(err); // Pass error to catch block
+        resolve(result);
+      });
+    });
 
-    if (result.length > 0) {
+    // If user exists, return an error
+    if (result && result.length > 0) {
       return res.status(400).json({ msg: "User already exists" });
     }
 
     // Hash the password
-    bcrypt.hash(password, 10, (err, hashedPassword) => {
-      if (err) return res.status(500).json({ msg: "Error hashing password" });
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-      // Insert user into database
-      const sql = "INSERT INTO users (name, email, password, telephone, address) VALUES (?, ?, ?, ?, ?)";
+    // Insert user into the database
+    const sql = "INSERT INTO users (name, email, password, telephone, address) VALUES (?, ?, ?, ?, ?)";
+    const insertResult = await new Promise((resolve, reject) => {
       con.query(sql, [name, email, hashedPassword, telephone, address], (err, result) => {
-        if (err) return res.status(500).json({ msg: "Error inserting user" });
-
-        res.status(201).json({ msg: "User registered successfully" });
+        if (err) return reject(err);
+        resolve(result);
       });
     });
-  });
+
+    res.status(201).json({
+      msg: "User registered successfully",
+      userId: insertResult.insertId
+    });
+
+  } catch (err) {
+    console.error("Error during signup: ", err);
+    return res.status(500).json({ msg: "Error during signup", errorDetails: err });
+  }
 };
 
 // User Sign-in
