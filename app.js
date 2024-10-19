@@ -7,6 +7,7 @@ const authRoutes = require('./routes/authRoutes'); // Authentication routes
 const itemRoutes = require('./routes/itemRouters'); // Item management routes
 const favoritesRoutes = require('./routes/favoritesRoutes');
 const rentalRoutes=require('./routes/rentalRoutes');
+const pickUpPointsRoutes=require('../routes/pickupPointsRoutes');
 
 app.use(express.json()); // Middleware to parse JSON bodies
 
@@ -22,6 +23,7 @@ app.use('/api/favorites', favoritesRoutes);
 
 app.use('/api/rental', rentalRoutes);
 
+app.use('/api/pickup', pickUpPointsRoutes);
 
 const testEmail = 'hajar.ihab@gmail.com'; // Replace with a valid email for testing
 const testItemName = 'Sample Item';
