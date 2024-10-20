@@ -139,7 +139,7 @@
 //     });
 // };
 
-
+const axios = require('axios'); // Make sure axios is installed to make HTTP requests
 const con = require("../config/database"); // Ensure this path is correct
 
 // Function to calculate the rental invoice based on the rental duration and item prices
@@ -166,8 +166,23 @@ const calculateRentalInvoice = (pricePerDay, pricePerWeek, pricePerMonth, priceP
     return totalCost; // Return total rental cost
 };
 
-exports.requestRental = (req, res) => {
-    const { serial_number, start_date, end_date, method, pickup_id } = req.body;
+// Helper function to fetch city from latitude and longitude
+async function getCityFromCoordinates(latitude, longitude) {
+    const apiKey = '0aa1eb33eefd41a5bf3ba8da99e66e82'; // Replace with your actual geolocation API key (e.g., OpenCage or Google Geocoding)
+    const url = `https://api.opencagedata.com/geocode/v1/json?q=${latitude}+${longitude}&key=${apiKey}`;
+
+    try {
+        const response = await axios.get(url);
+        const city = response.data.results[0].components.city || response.data.results[0].components.town || 'Unknown';
+        return city;
+    } catch (error) {
+        console.error("Error fetching city:", error);
+        return 'Unknown';
+    }
+}
+
+exports.requestRental = async (req, res) => {
+    const { serial_number, start_date, end_date, delivery_method, pickup_id } = req.body;
     const renter_id = req.user.id;
 
     const startDate = new Date(start_date);
@@ -180,7 +195,7 @@ exports.requestRental = (req, res) => {
         WHERE serial_number = ?;
     `;
 
-    con.query(itemQuery, [serial_number], (err, itemResult) => {
+    con.query(itemQuery, [serial_number], async (err, itemResult) => {
         if (err) {
             console.error(err);
             return res.status(500).json({ msg: "An error occurred while retrieving the item.", error: err });
@@ -194,14 +209,13 @@ exports.requestRental = (req, res) => {
         const availabilityStart = new Date(item.available_from);
         const availabilityEnd = new Date(item.available_until);
 
-        // Step 2: Check if requested rental dates fall within the item's availability dates
         if (startDate < availabilityStart || endDate > availabilityEnd) {
             return res.status(400).json({
                 msg: `Item is only available from ${availabilityStart.toISOString().split('T')[0]} to ${availabilityEnd.toISOString().split('T')[0]}.`
             });
         }
 
-        // Step 3: Check for rental conflicts in the rental table
+        // Step 2: Check for rental conflicts
         const rentalCheckQuery = `
             SELECT *
             FROM rental
@@ -213,7 +227,7 @@ exports.requestRental = (req, res) => {
             );
         `;
 
-        con.query(rentalCheckQuery, [item.id, endDate, startDate, endDate, startDate, startDate, endDate], (err, rentalResult) => {
+        con.query(rentalCheckQuery, [item.id, endDate, startDate, endDate, startDate, startDate, endDate], async (err, rentalResult) => {
             if (err) {
                 console.error(err);
                 return res.status(500).json({ msg: "An error occurred while checking rental conflicts.", error: err });
@@ -231,6 +245,29 @@ exports.requestRental = (req, res) => {
                 return res.status(400).json({ msg: "Invalid rental period." });
             }
 
+            // Step 3: Determine geographical location
+            let geographical_location = 'Unknown';
+            if (delivery_method === "delivery") {
+                // Fetch latitude and longitude using the user's IP address
+                const userIP = '46.244.85.228'; // Get the public IP from header
+                try {
+                    const response =  await axios.get(`https://api.ipgeolocation.io/ipgeo?apiKey=d184d7782ea44cddb96cbdb87f7c7c9e&ip=${userIP}`);
+    
+                    if (response.data.status === 'fail') {
+                        console.error("IP-API response failed:", response.data.message);
+                        geographical_location = "Geo"; // Fallback if there's an error
+                    } else {
+                        const { city, latitude, longitude } = response.data;
+                        geographical_location = `${city} (${latitude}, ${longitude})`; // Combine city with latitude and longitude
+                    }
+                } catch (error) {
+                    console.error("Error fetching location from IP:", error);
+                    geographical_location = "Geo"; // Fallback if there's an error
+                }
+            } else if (delivery_method === 'pickup') {
+                geographical_location = `Pickup ID: ${pickup_id}`;
+            }
+
             // Step 4: Calculate the rental invoice
             const totalCost = calculateRentalInvoice(
                 item.price_per_day,
@@ -241,52 +278,30 @@ exports.requestRental = (req, res) => {
                 endDate
             );
 
-            // Step 5: Determine the pickup or geo-location option
-            let geographical_location = "Geo";
-            let pickupQuery = "";
+            // Step 5: Insert the rental request
+            const requestQuery = `
+                INSERT INTO rental_request (item_id, owner_id, renter_id, start_date, end_date, total_cost, geographical_location)
+                VALUES (?, ?, ?, ?, ?, ?, ?);
+            `;
 
-            if (method === 'pickup') {
-                if (!pickup_id) {
-                    return res.status(400).json({ msg: "Pickup method selected, but no pickup point ID provided." });
-                }
-                pickupQuery = `
-                    INSERT INTO rental_request (item_id, owner_id, renter_id, start_date, end_date, total_cost, pickup_id, geographical_location)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, NULL);
-                `;
-            } else if (method === 'delivery') {
-                pickupQuery = `
-                    INSERT INTO rental_request (item_id, owner_id, renter_id, start_date, end_date, total_cost, pickup_id, geographical_location)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?);
-                `;
-            } else {
-                return res.status(400).json({ msg: "Invalid method. Choose either 'pickup' or 'geo'." });
-            }
-
-            // Step 6: Insert the rental request based on method
-            con.query(pickupQuery, [
-                item.id, 
-                item.user_id, 
-                renter_id, 
-                startDate, 
-                endDate, 
-                totalCost, 
-                method === 'pickup' ? pickup_id : null, 
-                method === 'delivery' ? geographical_location : null
-            ], (err, result) => {
+            con.query(requestQuery, [item.id, item.user_id, renter_id, startDate, endDate, totalCost, geographical_location], (err, result) => {
                 if (err) {
                     console.error(err);
-                    return res.status(500).json({ msg: "An error occurred while creating the rental request.", error: err });
+                    return res.status(500).json({ msg: "An error occurred while creating rental request.", error: err });
                 }
 
                 res.status(201).json({
                     msg: "Rental request created successfully",
                     requestId: result.insertId,
-                    totalCost: totalCost
+                    totalCost: totalCost,
+                    geographical_location: geographical_location
                 });
             });
         });
     });
 };
+
+
 
 
 exports.getRentalRequests = (req, res) => {

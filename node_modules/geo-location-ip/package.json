@@ -1,0 +1,26 @@
+{
+  "name": "geo-location-ip",
+  "version": "1.0.0",
+  "description": "An npm package to find location using ip address",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm run test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dhruvsethi708/geo-location-ip.git"
+  },
+  "keywords": [
+    "npm"
+  ],
+  "author": "Dhruv Sethi",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/dhruvsethi708/geo-location-ip/issues"
+  },
+  "homepage": "https://github.com/dhruvsethi708/geo-location-ip#readme",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "node-fetch": "^2.6.1"
+  }
+}
