@@ -167,7 +167,7 @@ const calculateRentalInvoice = (pricePerDay, pricePerWeek, pricePerMonth, priceP
 };
 
 exports.requestRental = (req, res) => {
-    const { serial_number, start_date, end_date } = req.body;
+    const { serial_number, start_date, end_date, method, pickup_id } = req.body;
     const renter_id = req.user.id;
 
     const startDate = new Date(start_date);
@@ -191,8 +191,8 @@ exports.requestRental = (req, res) => {
         }
 
         const item = itemResult[0];
-        const availabilityStart = new Date(item.availability_start);
-        const availabilityEnd = new Date(item.availability_end);
+        const availabilityStart = new Date(item.available_from);
+        const availabilityEnd = new Date(item.available_until);
 
         // Step 2: Check if requested rental dates fall within the item's availability dates
         if (startDate < availabilityStart || endDate > availabilityEnd) {
@@ -241,17 +241,41 @@ exports.requestRental = (req, res) => {
                 endDate
             );
 
-            // Step 5: Insert the rental request
-            const requestQuery = `
-    INSERT INTO rental_request (item_id, owner_id, renter_id, start_date, end_date, total_cost)
-    VALUES (?, ?, ?, ?, ?, ?);
-`;
+            // Step 5: Determine the pickup or geo-location option
+            let geographical_location = "Geo";
+            let pickupQuery = "";
 
+            if (method === 'pickup') {
+                if (!pickup_id) {
+                    return res.status(400).json({ msg: "Pickup method selected, but no pickup point ID provided." });
+                }
+                pickupQuery = `
+                    INSERT INTO rental_request (item_id, owner_id, renter_id, start_date, end_date, total_cost, pickup_id, geographical_location)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, NULL);
+                `;
+            } else if (method === 'delivery') {
+                pickupQuery = `
+                    INSERT INTO rental_request (item_id, owner_id, renter_id, start_date, end_date, total_cost, pickup_id, geographical_location)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                `;
+            } else {
+                return res.status(400).json({ msg: "Invalid method. Choose either 'pickup' or 'geo'." });
+            }
 
-            con.query(requestQuery, [item.id, item.user_id, renter_id, startDate, endDate, totalCost], (err, result) => {
+            // Step 6: Insert the rental request based on method
+            con.query(pickupQuery, [
+                item.id, 
+                item.user_id, 
+                renter_id, 
+                startDate, 
+                endDate, 
+                totalCost, 
+                method === 'pickup' ? pickup_id : null, 
+                method === 'delivery' ? geographical_location : null
+            ], (err, result) => {
                 if (err) {
                     console.error(err);
-                    return res.status(500).json({ msg: "An error occurred while creating rental request.", error: err });
+                    return res.status(500).json({ msg: "An error occurred while creating the rental request.", error: err });
                 }
 
                 res.status(201).json({
@@ -263,6 +287,7 @@ exports.requestRental = (req, res) => {
         });
     });
 };
+
 
 exports.getRentalRequests = (req, res) => {
     const renter_id = req.user.id;
