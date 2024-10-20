@@ -1,5 +1,3 @@
-// const con = require("../config/database");
-
 // exports.requestRental = (req, res) => {
 //     const { serial_number, start_date, end_date } = req.body;
 
