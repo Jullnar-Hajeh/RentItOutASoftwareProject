@@ -262,7 +262,7 @@ exports.requestRental = async (req, res) => {
                     }
                 } catch (error) {
                     console.error("Error fetching location from IP:", error);
-                    geographical_location = "Geo"; // Fallback if there's an error
+                    geographical_location = "Geo"; 
                 }
             } else if (delivery_method === 'pickup') {
                 geographical_location = `Pickup ID: ${pickup_id}`;
