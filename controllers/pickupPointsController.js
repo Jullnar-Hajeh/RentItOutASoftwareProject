@@ -1,5 +1,23 @@
 const con = require("../config/database"); // Database connection
+exports.getPickupPointsByOwner = (req, res) => {
+  const { user_id } = req.params; 
 
+  if (!user_id) {
+    return res.status(400).json({ msg: "Please provide a valid user ID." });
+  }
+
+  const sql = `SELECT location,serial_number FROM pickup_points WHERE user_id = ?`;
+
+  con.query(sql, [user_id], (err, results) => {
+    if (err) {
+      return res.status(500).json({ msg: "Error fetching pickup points", err });
+    }
+    if (results.length === 0) {
+      return res.status(404).json({ msg: "No pickup points found for this owner." });
+    }
+    res.status(200).json({ pickupPoints: results });
+  });
+};
 // Add a new pickup point
 exports.addPickupPoint = (req, res) => {
   const { location } = req.body;
