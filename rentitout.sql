@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Oct 19, 2024 at 09:00 PM
+-- Generation Time: Oct 20, 2024 at 05:39 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -70,7 +70,7 @@ CREATE TABLE `item` (
 --
 
 INSERT INTO `item` (`id`, `user_id`, `name`, `description`, `category`, `price_per_day`, `price_per_week`, `price_per_month`, `price_per_year`, `available_from`, `available_until`, `status`, `created_at`, `updated_at`, `serial_number`) VALUES
-(1, 1, 'Updated Lawn Mower', 'An updated powerful lawn mower.', 'Gardening', 12.00, 55.00, 160.00, 1250.00, '2024-10-01', '2024-12-31', 'available', '2024-10-03 08:01:51', '2024-10-03 08:06:05', NULL),
+(1, 1, 'Updated Lawn Mower', 'An updated powerful lawn mower.', 'Gardening', 12.00, 55.00, 160.00, 1250.00, '2024-10-01', '2024-12-31', 'available', '2024-10-03 08:01:51', '2024-10-19 19:27:14', 11),
 (4, 1, 'Item Name', 'Description of the item', 'Category Name', 10.00, 60.00, 200.00, 800.00, '2024-10-15', '2024-11-15', 'available', '2024-10-10 21:11:28', '2024-10-10 21:11:28', 1),
 (5, 3, 'Item Name', 'Item Description', 'Category', 10.00, 60.00, 200.00, 1000.00, '2024-10-10', '2024-12-31', 'available', '2024-10-10 21:53:57', '2024-10-10 21:53:57', 2);
 
@@ -186,6 +186,8 @@ CREATE TABLE `rental_request` (
   `start_date` date NOT NULL,
   `end_date` date NOT NULL,
   `total_cost` decimal(10,2) DEFAULT NULL,
+  `pickup_id` int(11) DEFAULT NULL,
+  `geographical_location` varchar(500) DEFAULT NULL,
   `serial_number` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -193,18 +195,19 @@ CREATE TABLE `rental_request` (
 -- Dumping data for table `rental_request`
 --
 
-INSERT INTO `rental_request` (`id`, `item_id`, `owner_id`, `renter_id`, `status`, `request_date`, `start_date`, `end_date`, `total_cost`, `serial_number`) VALUES
-(2, 4, 1, 3, 'pending', '2024-10-11', '2024-10-15', '2024-10-20', NULL, NULL),
-(3, 5, 3, 3, 'declined', '2024-10-11', '2024-10-15', '2024-10-20', 50.00, NULL),
-(4, 4, 1, 3, 'pending', '2024-10-11', '2024-10-15', '2024-12-16', 600.00, NULL),
-(20, 4, 1, 3, 'pending', '2024-10-11', '2024-10-15', '2024-10-20', 50.00, 1),
-(21, 4, 1, 3, 'pending', '2024-10-11', '2024-10-15', '2024-10-20', 50.00, 2),
-(22, 4, 1, 3, 'pending', '2024-10-11', '2024-10-15', '2024-10-20', 50.00, 3),
-(23, 4, 1, 3, 'pending', '2024-10-11', '2024-10-15', '2024-10-20', 50.00, 4),
-(24, 5, 3, 3, 'approved', '2024-10-11', '2024-10-15', '2024-10-20', 50.00, 5),
-(25, 5, 3, 3, 'pending', '2024-10-11', '2024-10-15', '2024-10-20', 50.00, 6),
-(26, 5, 3, 3, 'approved', '2024-10-11', '2024-12-31', '2025-11-12', 2320.00, 7),
-(27, 5, 3, 3, 'approved', '2024-10-11', '2024-10-01', '2024-10-02', 10.00, 8);
+INSERT INTO `rental_request` (`id`, `item_id`, `owner_id`, `renter_id`, `status`, `request_date`, `start_date`, `end_date`, `total_cost`, `pickup_id`, `geographical_location`, `serial_number`) VALUES
+(2, 4, 1, 3, 'pending', '2024-10-11', '2024-10-15', '2024-10-20', NULL, NULL, NULL, NULL),
+(3, 5, 3, 3, 'declined', '2024-10-11', '2024-10-15', '2024-10-20', 50.00, NULL, NULL, NULL),
+(4, 4, 1, 3, 'pending', '2024-10-11', '2024-10-15', '2024-12-16', 600.00, NULL, NULL, NULL),
+(20, 4, 1, 3, 'pending', '2024-10-11', '2024-10-15', '2024-10-20', 50.00, NULL, NULL, 1),
+(21, 4, 1, 3, 'pending', '2024-10-11', '2024-10-15', '2024-10-20', 50.00, NULL, NULL, 2),
+(22, 4, 1, 3, 'pending', '2024-10-11', '2024-10-15', '2024-10-20', 50.00, NULL, NULL, 3),
+(23, 4, 1, 3, 'pending', '2024-10-11', '2024-10-15', '2024-10-20', 50.00, NULL, NULL, 4),
+(24, 5, 3, 3, 'approved', '2024-10-11', '2024-10-15', '2024-10-20', 50.00, NULL, NULL, 5),
+(25, 5, 3, 3, 'pending', '2024-10-11', '2024-10-15', '2024-10-20', 50.00, NULL, NULL, 6),
+(26, 5, 3, 3, 'approved', '2024-10-11', '2024-12-31', '2025-11-12', 2320.00, NULL, NULL, 7),
+(27, 5, 3, 3, 'approved', '2024-10-11', '2024-10-01', '2024-10-02', 10.00, NULL, NULL, 8),
+(30, 1, 1, 4, 'pending', '2024-10-19', '2024-10-05', '2024-11-05', 196.00, NULL, NULL, 12);
 
 --
 -- Triggers `rental_request`
@@ -300,7 +303,8 @@ ALTER TABLE `rental_request`
   ADD UNIQUE KEY `serial_number` (`serial_number`),
   ADD KEY `item_id` (`item_id`),
   ADD KEY `owner_id` (`owner_id`),
-  ADD KEY `renter_id` (`renter_id`);
+  ADD KEY `renter_id` (`renter_id`),
+  ADD KEY `fk_pickup_id` (`pickup_id`);
 
 --
 -- Indexes for table `users`
@@ -347,7 +351,7 @@ ALTER TABLE `rental`
 -- AUTO_INCREMENT for table `rental_request`
 --
 ALTER TABLE `rental_request`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=31;
 
 --
 -- AUTO_INCREMENT for table `users`
@@ -397,6 +401,7 @@ ALTER TABLE `rental`
 -- Constraints for table `rental_request`
 --
 ALTER TABLE `rental_request`
+  ADD CONSTRAINT `rental_request_ibfk4` FOREIGN KEY (`pickup_id`) REFERENCES `pickup_points` (`id`),
   ADD CONSTRAINT `rental_request_ibfk_1` FOREIGN KEY (`item_id`) REFERENCES `item` (`id`),
   ADD CONSTRAINT `rental_request_ibfk_2` FOREIGN KEY (`owner_id`) REFERENCES `users` (`userID`),
   ADD CONSTRAINT `rental_request_ibfk_3` FOREIGN KEY (`renter_id`) REFERENCES `users` (`userID`);
