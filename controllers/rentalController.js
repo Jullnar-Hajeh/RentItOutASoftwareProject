@@ -179,6 +179,26 @@ async function getCityFromCoordinates(latitude, longitude) {
     }
 }
 
+
+// Function to calculate distance between two coordinates
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const toRadians = (degrees) => degrees * (Math.PI / 180);
+
+    const R = 6371; // Radius of Earth in kilometers
+    const dLat = toRadians(lat2 - lat1);
+    const dLon = toRadians(lon2 - lon1);
+
+    const a = 
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * 
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c; // Distance in kilometers
+
+    return distance;
+}
+
 exports.requestRental = async (req, res) => {
     const { serial_number, start_date, end_date, delivery_method, pickup_id } = req.body;
     const renter_id = req.user.id;
@@ -243,62 +263,76 @@ exports.requestRental = async (req, res) => {
                 return res.status(400).json({ msg: "Invalid rental period." });
             }
 
-            // Step 3: Determine geographical location
+            // Step 3: Retrieve geographical location from users table
             let geographical_location = 'Unknown';
-            if (delivery_method === "delivery") {
-                // Fetch latitude and longitude using the user's IP address
-                const userIP = '46.244.85.228'; // Get the public IP from header
-                try {
-                    const response =  await axios.get(`https://api.ipgeolocation.io/ipgeo?apiKey=d184d7782ea44cddb96cbdb87f7c7c9e&ip=${userIP}`);
-    
-                    if (response.data.status === 'fail') {
-                        console.error("IP-API response failed:", response.data.message);
-                        geographical_location = "Geo"; // Fallback if there's an error
-                    } else {
-                        const { city, latitude, longitude } = response.data;
-                        geographical_location = `${city} (${latitude}, ${longitude})`; // Combine city with latitude and longitude
-                    }
-                } catch (error) {
-                    console.error("Error fetching location from IP:", error);
-                    geographical_location = "Geo"; 
-                }
-            } else if (delivery_method === 'pickup') {
-                geographical_location = `Pickup ID: ${pickup_id}`;
-            }
+            let additionalCost = 0;
+            
+            const owner_id = item.user_id;
 
-            // Step 4: Calculate the rental invoice
-            const totalCost = calculateRentalInvoice(
-                item.price_per_day,
-                item.price_per_week,
-                item.price_per_month,
-                item.price_per_year,
-                startDate,
-                endDate
-            );
-
-            // Step 5: Insert the rental request
-            const requestQuery = `
-                INSERT INTO rental_request (item_id, owner_id, renter_id, start_date, end_date, total_cost, geographical_location)
-                VALUES (?, ?, ?, ?, ?, ?, ?);
+            const userLocationQuery = `
+                SELECT userID, address
+                FROM users
+                WHERE userID IN (?, ?);
             `;
-
-            con.query(requestQuery, [item.id, item.user_id, renter_id, startDate, endDate, totalCost, geographical_location], (err, result) => {
+            con.query(userLocationQuery, [owner_id, renter_id], async (err, userLocations) => {
                 if (err) {
                     console.error(err);
-                    return res.status(500).json({ msg: "An error occurred while creating rental request.", error: err });
+                    return res.status(500).json({ msg: "An error occurred while retrieving user locations.", error: err });
                 }
 
-                res.status(201).json({
-                    msg: "Rental request created successfully",
-                    requestId: result.insertId,
-                    totalCost: totalCost,
-                    geographical_location: geographical_location
+                // Parse addresses to extract latitude and longitude
+                const ownerLocation = userLocations.find(u => u.userID === owner_id)?.address;
+                const renterLocation = userLocations.find(u => u.userID === renter_id)?.address;
+                if (ownerLocation && renterLocation) {
+                    const [ownerCity, ownerCoords] = ownerLocation.split(' (');
+                    const [renterCity, renterCoords] = renterLocation.split(' (');
+                    const [ownerLat, ownerLon] = ownerCoords.replace(')', '').split(', ').map(Number);
+                    const [renterLat, renterLon] = renterCoords.replace(')', '').split(', ').map(Number);
+
+                    if (delivery_method === "delivery") {
+                        const distance = calculateDistance(ownerLat, ownerLon, renterLat, renterLon);
+                        additionalCost = distance; // Add distance to total cost
+                        geographical_location = `${ownerCity} to ${renterCity} - Distance: ${distance.toFixed(2)} km`;
+                    } else if (delivery_method === 'pickup') {
+                        geographical_location = `Pickup ID: ${pickup_id}`;
+                    }
+                } else {
+                    return res.status(500).json({ msg: "Could not retrieve user locations." });
+                }
+
+                // Step 4: Calculate the rental invoice
+                const totalCost = calculateRentalInvoice(
+                    item.price_per_day,
+                    item.price_per_week,
+                    item.price_per_month,
+                    item.price_per_year,
+                    startDate,
+                    endDate
+                ) + additionalCost;
+
+                // Step 5: Insert the rental request
+                const requestQuery = `
+                    INSERT INTO rental_request (item_id, owner_id, renter_id, start_date, end_date, total_cost, geographical_location)
+                    VALUES (?, ?, ?, ?, ?, ?, ?);
+                `;
+
+                con.query(requestQuery, [item.id, owner_id, renter_id, startDate, endDate, totalCost, geographical_location], (err, result) => {
+                    if (err) {
+                        console.error(err);
+                        return res.status(500).json({ msg: "An error occurred while creating rental request.", error: err });
+                    }
+
+                    res.status(201).json({
+                        msg: "Rental request created successfully",
+                        requestId: result.insertId,
+                        totalCost: totalCost,
+                        geographical_location: geographical_location
+                    });
                 });
             });
         });
     });
 };
-
 
 
 
