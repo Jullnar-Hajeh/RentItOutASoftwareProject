@@ -245,7 +245,7 @@ exports.requestRental = async (req, res) => {
             );
         `;
 
-        con.query(rentalCheckQuery, [item.id, endDate, startDate, endDate, startDate, startDate, endDate], async (err, rentalResult) => {
+        con.query(rentalCheckQuery, [item.id, endDate, startDate, endDate, startDate, startDate, endDate], (err, rentalResult) => {
             if (err) {
                 console.error(err);
                 return res.status(500).json({ msg: "An error occurred while checking rental conflicts.", error: err });
@@ -263,60 +263,59 @@ exports.requestRental = async (req, res) => {
                 return res.status(400).json({ msg: "Invalid rental period." });
             }
 
-            // Step 3: Retrieve geographical location from users table
-            let geographical_location = 'Unknown';
-            let additionalCost = 0;
-            
-            const owner_id = item.user_id;
+            // Step 3: Get geographical locations from the users table
+            let renterLocation, ownerLocation;
 
-            const userLocationQuery = `
-                SELECT userID, address
-                FROM users
-                WHERE userID IN (?, ?);
+            const userQuery = `
+                SELECT address FROM users WHERE userID IN (?, ?);
             `;
-            con.query(userLocationQuery, [owner_id, renter_id], async (err, userLocations) => {
+
+            con.query(userQuery, [renter_id, item.user_id], (err, userResult) => {
                 if (err) {
                     console.error(err);
-                    return res.status(500).json({ msg: "An error occurred while retrieving user locations.", error: err });
+                    return res.status(500).json({ msg: "An error occurred while retrieving user addresses.", error: err });
                 }
 
-                // Parse addresses to extract latitude and longitude
-                const ownerLocation = userLocations.find(u => u.userID === owner_id)?.address;
-                const renterLocation = userLocations.find(u => u.userID === renter_id)?.address;
-                if (ownerLocation && renterLocation) {
-                    const [ownerCity, ownerCoords] = ownerLocation.split(' (');
-                    const [renterCity, renterCoords] = renterLocation.split(' (');
-                    const [ownerLat, ownerLon] = ownerCoords.replace(')', '').split(', ').map(Number);
-                    const [renterLat, renterLon] = renterCoords.replace(')', '').split(', ').map(Number);
-
-                    if (delivery_method === "delivery") {
-                        const distance = calculateDistance(ownerLat, ownerLon, renterLat, renterLon);
-                        additionalCost = distance; // Add distance to total cost
-                        geographical_location = `${ownerCity} to ${renterCity} - Distance: ${distance.toFixed(2)} km`;
-                    } else if (delivery_method === 'pickup') {
-                        geographical_location = `Pickup ID: ${pickup_id}`;
-                    }
-                } else {
-                    return res.status(500).json({ msg: "Could not retrieve user locations." });
+                if (userResult.length < 2) {
+                    return res.status(404).json({ msg: "Owner or renter not found." });
                 }
 
-                // Step 4: Calculate the rental invoice
-                const totalCost = calculateRentalInvoice(
+                renterLocation = userResult[0].address;
+                ownerLocation = userResult[1].address;
+
+                // Extract latitude and longitude from addresses
+                const renterCoords = renterLocation.match(/\(([^)]+)\)/)[1].split(',').map(Number);
+                const ownerCoords = ownerLocation.match(/\(([^)]+)\)/)[1].split(',').map(Number);
+
+                const [renterLat, renterLon] = renterCoords;
+                const [ownerLat, ownerLon] = ownerCoords;
+
+                let totalCost = calculateRentalInvoice(
                     item.price_per_day,
                     item.price_per_week,
                     item.price_per_month,
                     item.price_per_year,
                     startDate,
                     endDate
-                ) + additionalCost;
+                );
+
+                // Step 4: Calculate distance if delivery method is chosen
+                if (delivery_method === "delivery") {
+                    const distance = calculateDistance(renterLat, renterLon, ownerLat, ownerLon);
+                    // Calculate delivery cost based on distance
+                    const deliveryCost = calculateDeliveryCost(distance);
+                    console.log(deliveryCost);
+                    // Add delivery cost to total cost
+                    totalCost += deliveryCost;
+                }
 
                 // Step 5: Insert the rental request
                 const requestQuery = `
-                    INSERT INTO rental_request (item_id, owner_id, renter_id, start_date, end_date, total_cost, geographical_location)
-                    VALUES (?, ?, ?, ?, ?, ?, ?);
+                    INSERT INTO rental_request (item_id, owner_id, renter_id, start_date, end_date, total_cost, pickup_id, geographical_location)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?);
                 `;
 
-                con.query(requestQuery, [item.id, owner_id, renter_id, startDate, endDate, totalCost, geographical_location], (err, result) => {
+                con.query(requestQuery, [item.id, item.user_id, renter_id, startDate, endDate, totalCost, pickup_id, `${ownerLocation} to ${renterLocation}`], (err, result) => {
                     if (err) {
                         console.error(err);
                         return res.status(500).json({ msg: "An error occurred while creating rental request.", error: err });
@@ -326,13 +325,27 @@ exports.requestRental = async (req, res) => {
                         msg: "Rental request created successfully",
                         requestId: result.insertId,
                         totalCost: totalCost,
-                        geographical_location: geographical_location
+                        geographical_location: `${ownerLocation} to ${renterLocation}`
                     });
                 });
             });
         });
     });
 };
+
+// Function to calculate delivery cost based on distance
+function calculateDeliveryCost(distance) {
+    if (distance < 20) {
+        return 10; // Cost is 10 if distance is less than 20 km
+    } else {
+        // Calculate cost based on 20 km increments
+        const increments = Math.ceil(distance / 20); // Round up to the nearest 20 km
+        return increments * 20; // Cost is 20 for each increment
+    }
+}
+
+
+
 
 
 
