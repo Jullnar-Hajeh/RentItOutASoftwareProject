@@ -39,18 +39,37 @@ async function getCityFromCoordinates(latitude, longitude) {
         return 'Unknown';
     }
 }
-// Helper function to calculate delivery cost
-async function calculateDeliveryCost(delivery_location) {
-   
-    const baseDeliveryCost = 10; // Example base cost
-   
-        // if method is delivery, distance in km between owner and renter * price per km
-        // if method is pickup, distance in km between owner and pickup point * price per km
-        // or maybe for pickup points there should be just a fixed price without calculating distance
-        // for now I set the delivery cost to a fixed number because idk how to calculate distance
-        
-    return baseDeliveryCost; 
+
+// Function to calculate distance between two coordinates
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const toRadians = (degrees) => degrees * (Math.PI / 180);
+
+    const R = 6371; // Radius of Earth in kilometers
+    const dLat = toRadians(lat2 - lat1);
+    const dLon = toRadians(lon2 - lon1);
+
+    const a = 
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * 
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c; // Distance in kilometers
+
+    return distance;
 }
+// Function to calculate delivery cost based on distance
+function calculateDeliveryCost(distance) {
+    if (distance < 20) {
+        return 10; // Cost is 10 if distance is less than 20 km
+    } else {
+        // Calculate cost based on 20 km increments
+        const increments = Math.ceil(distance / 20); // Round up to the nearest 20 km
+        return increments * 20; // Cost is 20 for each increment
+    }
+}
+
+
 
 exports.requestRental = async (req, res) => {
     const { serial_number, start_date, end_date, delivery_method, pickup_id } = req.body;
@@ -117,60 +136,74 @@ exports.requestRental = async (req, res) => {
                 return res.status(400).json({ msg: "Invalid rental period." });
             }
 
-            // Step 3: Determine geographical location
-            let geographical_location = 'Unknown';
-            if (delivery_method === "delivery") {
-                // Fetch latitude and longitude using the user's IP address
-                const userIP = '46.244.85.228'; // Get the public IP from header
-                try {
-                    const response =  await axios.get(`https://api.ipgeolocation.io/ipgeo?apiKey=d184d7782ea44cddb96cbdb87f7c7c9e&ip=${userIP}`);
-    
-                    if (response.data.status === 'fail') {
-                        console.error("IP-API response failed:", response.data.message);
-                        geographical_location = "Geo"; // Fallback if there's an error
-                    } else {
-                        const { city, latitude, longitude } = response.data;
-                        geographical_location = `${city} (${latitude}, ${longitude})`; // Combine city with latitude and longitude
-                    }
-                } catch (error) {
-                    console.error("Error fetching location from IP:", error);
-                    geographical_location = "Geo"; 
-                }
-            } else if (delivery_method === 'pickup') {
-                geographical_location = `Pickup ID: ${pickup_id}`;
-            }
+            // Step 3: Get geographical locations from the users table
+            let renterLocation, ownerLocation;
 
-            // Step 4: Check loyalty card eligibility
+            const userQuery = `
+                SELECT address FROM users WHERE userID IN (?, ?);
+            `;
+
+            con.query(userQuery, [renter_id, item.user_id], async (err, userResult) => {
+                if (err) {
+                    console.error(err);
+                    return res.status(500).json({ msg: "An error occurred while retrieving user addresses.", error: err });
+                }
+
+                if (userResult.length < 2) {
+                    return res.status(404).json({ msg: "Owner or renter not found." });
+                }
+
+                renterLocation = userResult[0].address;
+                ownerLocation = userResult[1].address;
+
+                // Extract latitude and longitude from addresses
+                const renterCoords = renterLocation.match(/\(([^)]+)\)/)[1].split(',').map(Number);
+                const ownerCoords = ownerLocation.match(/\(([^)]+)\)/)[1].split(',').map(Number);
+                const [renterLat, renterLon] = renterCoords;
+                const [ownerLat, ownerLon] = ownerCoords;
+
+                // Step 4: Check loyalty card eligibility
             const currentMonth = startDate.getMonth() + 1; // getMonth() returns 0-11
             const currentYear = startDate.getFullYear();
             
             const { loyaltyCard, discount } = await checkLoyaltyCard(renter_id, item.user_id, currentMonth, currentYear);
 
-            // Step 5: Calculate the rental invoice
-            const totalCost = calculateRentalInvoice(
-                item.price_per_day,
-                item.price_per_week,
-                item.price_per_month,
-                item.price_per_year,
-                startDate,
-                endDate
-            );
 
-            // Step 6: Apply discount based on the loyalty card
-            let finalCost = totalCost * (1 - discount);
+                let totalCost = calculateRentalInvoice(
+                    item.price_per_day,
+                    item.price_per_week,
+                    item.price_per_month,
+                    item.price_per_year,
+                    startDate,
+                    endDate
+                );
 
-             // Prepare the message based on loyalty status and discount
-             let discountMessage = "No discount applied.";
-             if (loyaltyCard === 'gold' && discount === 0.5) {
-                 discountMessage = "You have a gold loyalty card with a 50% discount.";
-             } else if (loyaltyCard === 'gold' && discount === 0.15) {
-                 discountMessage = "You have a gold loyalty card with a 15% discount.";
-             } else if (loyaltyCard === 'silver' && discount === 0.25) {
-                 discountMessage = "You have a silver loyalty card with a 25% discount.";
-             }
+                // Step 4: Calculate distance if delivery method is chosen
+                if (delivery_method === "delivery") {
+                    const distance = calculateDistance(renterLat, renterLon, ownerLat, ownerLon);
+                    // Calculate delivery cost based on distance
+                    const deliveryCost = calculateDeliveryCost(distance);
+                    console.log("delivery cost: "+deliveryCost);
+                    // Add delivery cost to total cost
+                    totalCost += deliveryCost;
+                }
 
-            // Step 7: Insert the rental request
-            const requestQuery = `
+                // Step 6: Apply discount based on the loyalty card
+                let finalCost = totalCost * (1 - discount);
+
+                // Prepare the message based on loyalty status and discount
+                let discountMessage = "No discount applied.";
+                if (loyaltyCard === 'gold' && discount === 0.5) {
+                    discountMessage = "You have a gold loyalty card with a 50% discount.";
+                } else if (loyaltyCard === 'gold' && discount === 0.15) {
+                    discountMessage = "You have a gold loyalty card with a 15% discount.";
+                } else if (loyaltyCard === 'silver' && discount === 0.25) {
+                    discountMessage = "You have a silver loyalty card with a 25% discount.";
+                }
+
+
+                // Step 5: Insert the rental request
+                const requestQuery = `
                 INSERT INTO rental_request (item_id, owner_id, renter_id, start_date, end_date, total_cost, request_date)
                  VALUES (?, ?, ?, ?, ?, ?, CURDATE());
             `;
@@ -181,16 +214,19 @@ exports.requestRental = async (req, res) => {
                     return res.status(500).json({ msg: "An error occurred while creating rental request.", error: err });
                 }
 
-                res.status(201).json({
-                    msg: "Rental request created successfully",
-                    requestId: result.insertId,
-                    totalCost: finalCost, // Return the final cost after discount
-                    discountMessage
+                    res.status(201).json({
+                        msg: "Rental request created successfully",
+                        requestId: result.insertId,
+                        totalCost: finalCost, // Return the final cost after discount
+                        discountMessage,
+                        geographical_location: `${ownerLocation} to ${renterLocation}`
+                    });
                 });
             });
         });
     });
 };
+
 const checkLoyaltyCard = (renter_id, owner_id, currentMonth, currentYear) => {
     const loyaltyCheckQuery = `
         SELECT COUNT(*) AS rental_count
