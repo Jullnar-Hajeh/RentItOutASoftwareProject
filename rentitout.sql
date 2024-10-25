@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Oct 20, 2024 at 05:39 PM
+-- Generation Time: Oct 25, 2024 at 09:09 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -70,7 +70,7 @@ CREATE TABLE `item` (
 --
 
 INSERT INTO `item` (`id`, `user_id`, `name`, `description`, `category`, `price_per_day`, `price_per_week`, `price_per_month`, `price_per_year`, `available_from`, `available_until`, `status`, `created_at`, `updated_at`, `serial_number`) VALUES
-(1, 1, 'Updated Lawn Mower', 'An updated powerful lawn mower.', 'Gardening', 12.00, 55.00, 160.00, 1250.00, '2024-10-01', '2024-12-31', 'available', '2024-10-03 08:01:51', '2024-10-19 19:27:14', 11),
+(1, 1, 'Updated Lawn Mower', 'An updated powerful lawn mower.', 'Gardening', 12.00, 55.00, 160.00, 1250.00, '2024-10-01', '2024-12-31', 'available', '2024-10-03 08:01:51', '2024-10-25 17:59:43', 30),
 (4, 1, 'Item Name', 'Description of the item', 'Category Name', 10.00, 60.00, 200.00, 800.00, '2024-10-15', '2024-11-15', 'available', '2024-10-10 21:11:28', '2024-10-10 21:11:28', 1),
 (5, 3, 'Item Name', 'Item Description', 'Category', 10.00, 60.00, 200.00, 1000.00, '2024-10-10', '2024-12-31', 'available', '2024-10-10 21:53:57', '2024-10-10 21:53:57', 2);
 
@@ -207,7 +207,7 @@ INSERT INTO `rental_request` (`id`, `item_id`, `owner_id`, `renter_id`, `status`
 (25, 5, 3, 3, 'pending', '2024-10-11', '2024-10-15', '2024-10-20', 50.00, NULL, NULL, 6),
 (26, 5, 3, 3, 'approved', '2024-10-11', '2024-12-31', '2025-11-12', 2320.00, NULL, NULL, 7),
 (27, 5, 3, 3, 'approved', '2024-10-11', '2024-10-01', '2024-10-02', 10.00, NULL, NULL, 8),
-(30, 1, 1, 4, 'pending', '2024-10-19', '2024-10-05', '2024-11-05', 196.00, NULL, NULL, 12);
+(43, 1, 1, 5, 'pending', '2024-10-25', '2024-10-25', '2024-11-25', 236.00, NULL, 'Ramallah (31.90376, 35.20342) to Nablus (32.216663, 35.259006)', 31);
 
 --
 -- Triggers `rental_request`
@@ -245,10 +245,11 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`address`, `userID`, `name`, `password`, `email`, `telephone`) VALUES
-('123 Main St', 1, 'John Doe', '$2a$10$TW2sbPwWIArS0lRBEH6KWucdsRuhZUBas6j.fOWCiMsFA2QLcsZr6', 'john.doe@example.com', '1234567890'),
-('123 Main St', 2, 'John Doe', '$2a$10$rMu3qw/C99KuFK0lGDWBme6teiwR2vrHMblnCAr8hQmUG2xG3sYE6', 'jullnar@example.com', '1234567890'),
-('123 Main St, Anytown, USA', 3, 'jullanr haje', '$2a$10$PpLhqLZj1viwmIJebbBXcOt6bRqeCOjkYdIVA61T.eSmnjv7IYibO', 'hajar.ihab@gmail.com', '1234567890'),
-('Nablus', 4, 'Shahd', '$2a$10$7J6rtDQrBvZTFXefh3IPqOQYLt/YALhny5V8WUShUjdzMKYS46Nyu', 'shahd@gmail.com', '0599299172');
+('Nablus (32.216663, 35.259006)', 1, 'John Doe', '$2a$10$TW2sbPwWIArS0lRBEH6KWucdsRuhZUBas6j.fOWCiMsFA2QLcsZr6', 'john.doe@example.com', '1234567890'),
+('Ramallah (31.90376, 35.20342)', 2, 'John Doe', '$2a$10$rMu3qw/C99KuFK0lGDWBme6teiwR2vrHMblnCAr8hQmUG2xG3sYE6', 'jullnar@example.com', '1234567890'),
+('Ramallah (31.90376, 35.20342)', 3, 'jullanr haje', '$2a$10$PpLhqLZj1viwmIJebbBXcOt6bRqeCOjkYdIVA61T.eSmnjv7IYibO', 'hajar.ihab@gmail.com', '1234567890'),
+('Ramallah (31.90376, 35.20342)', 4, 'Shahd', '$2a$10$7J6rtDQrBvZTFXefh3IPqOQYLt/YALhny5V8WUShUjdzMKYS46Nyu', 'shahd@gmail.com', '0599299172'),
+('Ramallah (31.90376, 35.20342)', 5, 'Ahmad Ali', '$2a$10$MtysrjMkRm4tOiOsoEvnXu0Sz6rpOM9urKb7Oz1bCLS2zJi525RAS', 'ahmadali@gmail.com', '0599887766');
 
 --
 -- Indexes for dumped tables
@@ -351,13 +352,13 @@ ALTER TABLE `rental`
 -- AUTO_INCREMENT for table `rental_request`
 --
 ALTER TABLE `rental_request`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=31;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=44;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `userID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `userID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- Constraints for dumped tables
