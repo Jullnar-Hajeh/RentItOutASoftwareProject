@@ -304,7 +304,6 @@ exports.requestRental = async (req, res) => {
                     const distance = calculateDistance(renterLat, renterLon, ownerLat, ownerLon);
                     // Calculate delivery cost based on distance
                     const deliveryCost = calculateDeliveryCost(distance);
-                    console.log(deliveryCost);
                     // Add delivery cost to total cost
                     totalCost += deliveryCost;
                 }
