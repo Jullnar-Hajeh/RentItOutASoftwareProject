@@ -206,8 +206,8 @@ exports.requestRental = async (req, res) => {
 
                 // Step 5: Insert the rental request
                 const requestQuery = `
-                INSERT INTO rental_request (item_id, owner_id, renter_id, start_date, end_date, total_cost, request_date)
-                 VALUES (?, ?, ?, ?, ?, ?, CURDATE());
+                INSERT INTO rental_request (item_id, owner_id, renter_id, start_date, end_date, total_cost, pickup_id,request_date)
+                 VALUES (?, ?, ?, ?, ?, ?,?, CURDATE());
             `;
 
             con.query(requestQuery, [item.id, item.user_id, renter_id, startDate, endDate, finalCost, pickup_id], (err, result) => {
