@@ -10,10 +10,13 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@paypal/paypal-server-sdk": "^0.5.1",
     "axios": "^1.7.7",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^2.4.3",
+    "body-parser": "^1.20.3",
     "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
     "express": "^4.21.0",
     "geo-city-finder": "^0.4.1",
     "geo-location-ip": "^1.0.0",
@@ -21,6 +24,7 @@
     "mysql": "^2.18.1",
     "node-cron": "^3.0.3",
     "nodemailer": "^6.9.15",
+    "paypal-rest-sdk": "^1.8.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
   },
