@@ -1,23 +1,63 @@
 const con = require("../config/database"); // Database connection
+const { calculateDistance } = require('../controllers/rentalController'); // Import calculateDistance function
+
 exports.getPickupPointsByOwner = (req, res) => {
   const { user_id } = req.params; 
+  const signedInUserId = req.user.id; // Retrieve the signed-in user’s ID from the request
 
   if (!user_id) {
     return res.status(400).json({ msg: "Please provide a valid user ID." });
   }
 
-  const sql = `SELECT location,serial_number FROM pickup_points WHERE user_id = ?`;
+  // Step 1: Retrieve the signed-in user’s location from the users table
+  const getUserLocationQuery = `SELECT address FROM users WHERE userID = ?`;
 
-  con.query(sql, [user_id], (err, results) => {
+  con.query(getUserLocationQuery, [signedInUserId], (err, userResults) => {
     if (err) {
-      return res.status(500).json({ msg: "Error fetching pickup points", err });
+      return res.status(500).json({ msg: "Error retrieving user location.", err });
     }
-    if (results.length === 0) {
-      return res.status(404).json({ msg: "No pickup points found for this owner." });
+    if (userResults.length === 0) {
+      return res.status(404).json({ msg: "Signed-in user location not found." });
     }
-    res.status(200).json({ pickupPoints: results });
+
+    // Extract latitude and longitude from the location field
+    const userLocation = userResults[0].address;
+    console.log(userResults[0]);
+    const [userLat, userLon] = userLocation.match(/-?\d+\.\d+/g).map(Number);
+
+    // Step 2: Retrieve pickup points for the specified owner
+    const getPickupPointsQuery = `
+      SELECT location, serial_number 
+      FROM pickup_points 
+      WHERE user_id = ?`;
+
+    con.query(getPickupPointsQuery, [user_id], (err, pickupResults) => {
+      if (err) {
+        return res.status(500).json({ msg: "Error fetching pickup points.", err });
+      }
+      if (pickupResults.length === 0) {
+        return res.status(404).json({ msg: "No pickup points found for this owner." });
+      }
+
+      // Step 3: Calculate distance from signed-in user location to each pickup point location
+      const pickupPointsWithDistance = pickupResults.map(pickup => {
+        const [pickupLat, pickupLon] = pickup.location.split(' ').map(Number); 
+        const distance = calculateDistance(userLat, userLon, pickupLat, pickupLon);
+        return {
+          serial_number: pickup.serial_number,
+          location: pickup.location,
+          distance: `${distance.toFixed(2)} km` // Display distance rounded to two decimal places
+        };
+      });
+
+      // Step 4: Send response
+      res.status(200).json({ pickupPoints: pickupPointsWithDistance });
+    });
   });
 };
+
+
+
 // Add a new pickup point
 exports.addPickupPoint = (req, res) => {
   const { location } = req.body;

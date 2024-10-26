@@ -58,6 +58,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 
     return distance;
 }
+exports.calculateDistance = calculateDistance;
 // Function to calculate delivery cost based on distance
 function calculateDeliveryCost(distance) {
     if (distance < 20) {
@@ -177,12 +178,13 @@ exports.requestRental = async (req, res) => {
                     startDate,
                     endDate
                 );
-
+                var delivCost=0;
                 // Step 4: Calculate distance if delivery method is chosen
                 if (delivery_method === "delivery") {
                     const distance = calculateDistance(renterLat, renterLon, ownerLat, ownerLon);
                     // Calculate delivery cost based on distance
                     const deliveryCost = calculateDeliveryCost(distance);
+                    delivCost=deliveryCost;
                     console.log("delivery cost: "+deliveryCost);
                     // Add delivery cost to total cost
                     totalCost += deliveryCost;
@@ -208,19 +210,27 @@ exports.requestRental = async (req, res) => {
                  VALUES (?, ?, ?, ?, ?, ?, CURDATE());
             `;
 
-            con.query(requestQuery, [item.id, item.user_id, renter_id, startDate, endDate, finalCost], (err, result) => {
+            con.query(requestQuery, [item.id, item.user_id, renter_id, startDate, endDate, finalCost, pickup_id], (err, result) => {
                 if (err) {
                     console.error(err);
                     return res.status(500).json({ msg: "An error occurred while creating rental request.", error: err });
                 }
-
-                    res.status(201).json({
-                        msg: "Rental request created successfully",
-                        requestId: result.insertId,
-                        totalCost: finalCost, // Return the final cost after discount
-                        discountMessage,
-                        geographical_location: `${ownerLocation} to ${renterLocation}`
-                    });
+                    if(delivery_method==="delivery")
+                        res.status(201).json({
+                            msg: "Rental request created successfully",
+                            requestId: result.insertId,
+                            totalCost: finalCost, // Return the final cost after discount
+                            deliveryCost: delivCost,
+                            discountMessage,
+                            geographical_location: `${ownerLocation} to ${renterLocation}`
+                        });
+                    else
+                        res.status(201).json({
+                            msg: "Rental request created successfully",
+                            requestId: result.insertId,
+                            totalCost: finalCost, // Return the final cost after discount
+                            discountMessage,
+                        });
                 });
             });
         });
