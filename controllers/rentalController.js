@@ -1,6 +1,8 @@
 const axios = require('axios'); // Make sure axios is installed to make HTTP requests
 const con = require("../config/database"); // Ensure this path is correct
 
+const { generateAndSendInvoice } = require('../services/pdf'); 
+
 // Function to calculate the rental invoice based on the rental duration and item prices
 const calculateRentalInvoice = (pricePerDay, pricePerWeek, pricePerMonth, pricePerYear, startDate, endDate) => {
     const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)); // Calculate total rental days
@@ -419,7 +421,7 @@ exports.approveDeclineRequest = (req, res) => {
 
     // Step 1: Get the rental request based on the serial number
     const requestQuery = `
-        SELECT rr.id AS request_id, rr.item_id, rr.renter_id, rr.start_date, rr.end_date, rr.total_cost, rr.status 
+        SELECT rr.id AS request_id, rr.item_id, rr.renter_id, rr.start_date, rr.end_date, rr.total_cost, rr.status , rr.serial_number 
         FROM rental_request rr
         JOIN item i ON rr.item_id = i.id
         WHERE rr.serial_number = ? AND rr.owner_id = ?;
@@ -478,17 +480,33 @@ exports.approveDeclineRequest = (req, res) => {
                     VALUES (?, ?, ?, ?, 'rented', NOW(), ?, ?);
                 `;
 
+
+
+
+
                 con.query(rentalInsertQuery, [rentalRequest.item_id, rentalRequest.renter_id, rentalRequest.start_date, rentalRequest.end_date, owner_id, rentalRequest.total_cost], (err, rentalResult) => {
                     if (err) {
                         console.error(err);
                         return res.status(500).json({ msg: "An error occurred while creating the rental.", error: err });
                     }
+
+
+
+
+                    
                     const rentalId = rentalResult.insertId;  // Get the newly created rental ID
+
+
+
+                  
+                    // Step 1: Get the renter's email address from the users table
+
+
 
                     // Step 5: Create payment for the rental
                     const paymentInsertQuery = `
-                        INSERT INTO payment (amount, status, method, renter_id, owner_id, payment_type, rental_id)
-                        VALUES (?, 'pending', 'paypal', ?, ?, 'basic', ?);
+                        INSERT INTO payment (amount, status,  renter_id, owner_id, payment_type, rental_id)
+                        VALUES (?, 'pending',  ?, ?, 'basic', ?);
                     `;
 
                     const paymentAmount = rentalRequest.total_cost;  // Assuming the total cost includes delivery and other fees
@@ -511,6 +529,28 @@ exports.approveDeclineRequest = (req, res) => {
                                 return res.status(500).json({ msg: "An error occurred while updating the rental request status.", error: err });
                             }
 
+
+                           
+
+
+                            const renterQuery = `SELECT * FROM users WHERE userID = ?`;
+con.query(renterQuery, [rentalRequest.renter_id], (err, renterResult) => {
+    if (err) return res.status(500).json({ msg: "Error fetching renter info", error: err });
+
+    const itemQuery = `SELECT * FROM item WHERE id = ?`;
+    con.query(itemQuery, [rentalRequest.item_id], (err, itemResult) => {
+        if (err) return res.status(500).json({ msg: "Error fetching item info", error: err });
+
+        // Make sure all required fields are present before calling generateAndSendInvoice
+        if (rentalRequest && renterResult[0] && itemResult[0]) {
+            generateAndSendInvoice(rentalRequest, renterResult[0], itemResult[0]);
+        } else {
+            console.error("Missing data for invoice generation.");
+            return res.status(500).json({ msg: "Incomplete data for invoice generation." });
+        }
+    });
+});
+
                             res.status(200).json({
                                 msg: "Rental request approved, rental created, and payment initiated successfully.",
                                 paymentId: paymentResult.insertId,
@@ -520,7 +560,14 @@ exports.approveDeclineRequest = (req, res) => {
                         });
                     });
                 });
+
+
+                    
+
             }
+
+
+                         
             } else if (action === "decline") {
                 // Step 6: Update the rental request status to 'declined'
                 const updateRequestStatusQuery = `
@@ -670,141 +717,67 @@ exports.getRentedItems = (req, res) => {
 
 
 
-// exports.requestRental = (req, res) => {
-//     const { serial_number, start_date, end_date } = req.body;
 
-//     // Assuming req.user.id contains the logged-in user's ID
-//     const renter_id = req.user.id;
+const pool = require('../config/database');
+// Damage Report Method
+exports.damageReport = (req, res) => {
+    try {
+        const { rental_serial_number, item_serial_number, damage_description } = req.body;
+        const renter_id = req.user.id; // Get the renter_id from token
 
-//     // Step 1: Get the item details by serial_number
-//     const itemQuery = "SELECT id, user_id, status FROM item WHERE serial_number = ?";
-//     con.query(itemQuery, [serial_number], (err, itemResult) => {
-//         if (err) {
-//             console.error(err); // Log the error for debugging
-//             return res.status(500).json({ msg: "An error occurred while retrieving the item.", error: err });
-//         }
-
-//         // Check if the item was found
-//         if (itemResult.length === 0) {
-//             return res.status(404).json({ msg: "Item not found." });
-//         }
-
-//         const item = itemResult[0];
-
-//         // Step 2: Check if the item is available
-//         if (item.status !== 'available') {
-//             return res.status(400).json({ msg: "Item is not available for rent." });
-//         }
-
-//         // Step 3: Insert the rental request
-//         const requestQuery = `
-//             INSERT INTO rental_request (item_id, owner_id, renter_id, start_date, end_date)
-//             VALUES (?, ?, ?, ?, ?)
-//         `;
-//         con.query(requestQuery, [item.id, item.user_id, renter_id, start_date, end_date], (err, result) => {
-//             if (err) {
-//                 console.error(err); // Log the error for debugging
-//                 return res.status(500).json({ msg: "An error occurred while creating rental request.", error: err });
-//             }
-
-//             // Respond with success message and the newly created request ID
-//             res.status(201).json({ msg: "Rental request created successfully", requestId: result.insertId });
-//         });
-//     });
-// };
-// const con = require("../config/database"); // Ensure this path is correct
-
-// // Function to calculate the rental invoice based on the rental duration and item prices
-// const calculateRentalInvoice = (pricePerDay, pricePerWeek, pricePerMonth, pricePerYear, startDate, endDate) => {
-//     const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)); // Calculate total rental days
-//     let totalCost = 0;
-
-//     const months = Math.floor(totalDays / 28); // Each month is treated as 28 days
-//     const remainingDays = totalDays % 28;
-
-//     if (months > 0) {
-//         totalCost += months * pricePerMonth; // Add monthly costs
-//     }
-
-//     // Calculate remaining days cost if there are any
-//     if (remainingDays > 0) {
-//         if (remainingDays <= 7) {
-//             totalCost += remainingDays * pricePerDay; // Daily cost for leftover days
-//         } else {
-//             totalCost += Math.ceil(remainingDays / 7) * pricePerWeek; // Weekly cost for leftover days
-//         }
-//     }
-
-//     return totalCost; // Return total rental cost
-// };
-
-
-// exports.requestRental = (req, res) => {
-//     const { serial_number, start_date, end_date } = req.body;
-
-//     // Assuming req.user.id contains the logged-in user's ID
-//     const renter_id = req.user.id;
-
-//     // Step 1: Get the item details by serial_number
-//     const itemQuery = "SELECT id, user_id, status, price_per_day, price_per_week, price_per_month FROM item WHERE serial_number = ?";
-//     con.query(itemQuery, [serial_number], (err, itemResult) => {
-//         if (err) {
-//             console.error(err); // Log the error for debugging
-//             return res.status(500).json({ msg: "An error occurred while retrieving the item.", error: err });
-//         }
-
-//         // Check if the item was found
-//         if (itemResult.length === 0) {
-//             return res.status(404).json({ msg: "Item not found." });
-//         }
-
-//         const item = itemResult[0];
-
-//         // Step 2: Check if the item is available
-//         if (item.status !== 'available') {
-//             return res.status(400).json({ msg: "Item is not available for rent." });
-//         }
-
-
-
-
-
-
+        const rentalQuery = `
+            SELECT owner_id, (SELECT name FROM users WHERE userId = ?) AS renter_name,
+                   (SELECT name FROM item WHERE serial_number = ?) AS item_name
+            FROM rental WHERE serial_number = ?`;
         
+        pool.query(rentalQuery, [renter_id, item_serial_number, rental_serial_number], (err, rentalResults) => {
+            if (err) {
+                console.error(err);
+                return res.status(500).json({ error: 'An error occurred while retrieving rental information.' });
+            }
 
-//         // Step 3: Calculate the rental invoice
-//         const startDate = new Date(start_date);
-//         const endDate = new Date(end_date);
-//         if (startDate >= endDate) {
-//             return res.status(400).json({ msg: "Invalid rental period." });
-//         }
+            if (rentalResults.length === 0) {
+                return res.status(404).json({ error: 'Rental not found with this serial number' });
+            }
 
-//         const totalCost = calculateRentalInvoice(
-//             item.price_per_day,
-//             item.price_per_week,
-//             item.price_per_month,
-//             item.price_per_year,
-//             startDate,
-//             endDate
-//         );
+            const owner_id = rentalResults[0].owner_id;
+            const renter_name = rentalResults[0].renter_name;
+            const item_name = rentalResults[0].item_name;
 
-//         // Step 4: Insert the rental request
-//         const requestQuery = `
-//             INSERT INTO rental_request (item_id, owner_id, renter_id, start_date, end_date, total_cost)
-//             VALUES (?, ?, ?, ?, ?, ?)
-//         `;
-//         con.query(requestQuery, [item.id, item.user_id, renter_id, startDate, endDate, totalCost], (err, result) => {
-//             if (err) {
-//                 console.error(err); // Log the error for debugging
-//                 return res.status(500).json({ msg: "An error occurred while creating rental request.", error: err });
-//             }
+            const damageReportQuery = `
+                INSERT INTO damage_reports (
+                    rental_serial_number,
+                    renter_id,
+                    owner_id,
+                    item_serial_number,
+                    damage_description
+                ) VALUES (?, ?, ?, ?, ?)`;
+            
+            pool.query(damageReportQuery, [rental_serial_number, renter_id, owner_id, item_serial_number, damage_description], (err) => {
+                if (err) {
+                    console.error(err);
+                    return res.status(500).json({ error: 'An error occurred while submitting the damage report.' });
+                }
 
-//             // Respond with success message and the newly created request ID
-//             res.status(201).json({
-//                 msg: "Rental request created successfully",
-//                 requestId: result.insertId,
-//                 totalCost: totalCost // Return the calculated total cost
-//             });
-//         });
-//     });
-// };
+                const message = `Damage Report: Item ${item_name} reported damaged by ${renter_name}. Issue: ${damage_description}.`;
+
+                const notificationQuery = `
+                    INSERT INTO notifications (owner_id, message)
+                    VALUES (?, ?)`;
+                
+                pool.query(notificationQuery, [owner_id, message], (err) => {
+                    if (err) {
+                        console.error(err);
+                        return res.status(500).json({ error: 'An error occurred while creating the notification.' });
+                    }
+
+                    res.status(201).json({ message: 'Damage report submitted successfully.' });
+                });
+            });
+        });
+    } catch (error) {
+        console.error('Error in damage report:', error);
+        res.status(500).json({ error: 'An error occurred while submitting the damage report' });
+    }
+};
+

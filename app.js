@@ -1,16 +1,26 @@
 const express = require('express');
 const app = express();
 const cron = require('node-cron');
+const createInvoice = require('./services/pdf');
+const dotenv=require('dotenv');
 
+const router = express.Router();
+
+const ProfileRoutes = require('./routes/profileRoutes'); 
 const { sendEmailNotification } = require('./services/emailService');
 const authRoutes = require('./routes/authRoutes'); // Authentication routes
 const itemRoutes = require('./routes/itemRouters'); // Item management routes
 const favoritesRoutes = require('./routes/favoritesRoutes');
 const rentalRoutes=require('./routes/rentalRoutes');
 const reviewRoutes=require('./routes/reviewRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 const pickupPointsRoutes = require('./routes/pickupPointsRoutes')
+const roleMiddleware = require("./middleware/roleMiddleware");
+const isAdmin = require('./middleware/adminMiddleware');
 const paymentRoutes = require('./routes/paymentRoutes')
 const pool = require('./config/database');
+const dialogflowWebhookController = require('./controllers/dialogflowWebhookController');
+const notificationRoutes = require('./routes/notificationsRoutes');
 app.use(express.json()); // Middleware to parse JSON bodies
 
 app.use('/api/review', reviewRoutes);
@@ -24,15 +34,19 @@ app.use('/api/items', itemRoutes); // New line to include item routes
 app.use('/api/favorites', favoritesRoutes);
 
 app.use('/api/rental', rentalRoutes);
+app.use('/api/admin', adminRoutes); 
 
 app.use('/api/pickup', pickupPointsRoutes);
 
 app.use('/api/payment', paymentRoutes);
 
-// const testEmail = 'hajar.ihab@gmail.com'; // Replace with a valid email for testing
-// const testItemName = 'Sample Item';
-// const testRenterName = 'John Doe';
-// //sendEmailNotification(testEmail, testItemName, testRenterName, false);
+app.use('/api/notifications', notificationRoutes);
+// Profile Routes
+app.use('/api/profile', ProfileRoutes);
+app.use(router);
+// ChatBot Routes
+router.post('/api/ChatBot', dialogflowWebhookController);
+
 
 
 
@@ -83,7 +97,7 @@ cron.schedule('0 15 * * *', () => {
 });
 
 
-const PORT = 3000;
+const PORT = 3000
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 

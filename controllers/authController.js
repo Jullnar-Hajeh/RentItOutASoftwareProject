@@ -19,7 +19,7 @@ exports.signup = async (req, res) => {
       if (err) return res.status(500).json({ msg: "Database error", err });
 
       if (result.length > 0) {
-          return res.status(400).json({ msg: "User already exists" });
+          return res.status(409).json({ msg: "User already exists" });
       }
 
       // Fetch location based on IP address
@@ -79,8 +79,12 @@ exports.signin = (req, res) => {
         return res.status(400).json({ msg: "Invalid email or password" });
       }
 
-      // Generate JWT
-      const token = jwt.sign({ id: user.userID, email: user.email }, JWT_SECRET, { expiresIn: "1h" });
+      // Generate JWT with role included
+      const token = jwt.sign(
+        { id: user.userID, email: user.email, role: user.role },
+        JWT_SECRET,
+        { expiresIn: "1h" }
+      );
 
       res.status(200).json({
         msg: "Sign-in successful",

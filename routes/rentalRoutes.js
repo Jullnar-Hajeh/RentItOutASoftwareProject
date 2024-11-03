@@ -14,6 +14,7 @@ router.post("/approveDeclineRequest", authenticateJWT, rentalController.approveD
 router.post("/ReturnItem", authenticateJWT, rentalController.returnItem);
 
 router.get("/rented-items", authenticateJWT, rentalController.getRentedItems);
+router.post("/report-damage", authenticateJWT,rentalController.damageReport);
 
 
 

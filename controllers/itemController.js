@@ -25,41 +25,50 @@ exports.addItem = (req, res) => {
   ], (err, result) => {
     if (err) return res.status(500).json({ msg: "Error adding item", err });
 
-    res.status(201).json({ msg: "Item added successfully", itemId: result.insertId });
+    res.status(201).json({ msg: "Item added successfully"});
   });
 };
 // Edit an item
 exports.editItem = (req, res) => {
   const { name, description, category, price_per_day, price_per_week, price_per_month, price_per_year, available_from, available_until } = req.body;
-  const itemId = req.params.id;
+  const serialNumber = req.params.serialNumber;
 
-  const sql = `UPDATE item 
-               SET name = ?, description = ?, category = ?, price_per_day = ?, price_per_week = ?, price_per_month = ?, price_per_year = ?, available_from = ?, available_until = ?
-               WHERE id = ? AND user_id = ?`;
+  console.log("Serial Number:", serialNumber);
+  console.log("User ID:", req.user.id);
 
-  con.query(sql, [
-    name, 
-    description, 
-    category, 
-    price_per_day, 
-    price_per_week, 
-    price_per_month, 
-    price_per_year, 
-    available_from, 
-    available_until, 
-    itemId, 
-    req.user.id
-  ], (err, result) => {
-    if (err) return res.status(500).json({ msg: "Error updating item", err });
+  const checkOwnershipSql = `SELECT id FROM item WHERE serial_number = ? AND user_id = ?`;
+  con.query(checkOwnershipSql, [serialNumber, req.user.id], (err, results) => {
+    if (err) return res.status(500).json({ msg: "Error checking item ownership", err });
 
-    if (result.affectedRows === 0) {
+    if (results.length === 0) {
       return res.status(404).json({ msg: "Item not found or you don't have permission to edit it" });
     }
 
-    res.status(200).json({ msg: "Item updated successfully" });
+    const updateSql = `
+      UPDATE item 
+      SET name = ?, description = ?, category = ?, price_per_day = ?, price_per_week = ?, price_per_month = ?, price_per_year = ?, available_from = ?, available_until = ?
+      WHERE serial_number = ? AND user_id = ?
+    `;
+
+    con.query(updateSql, [
+      name, 
+      description, 
+      category, 
+      price_per_day, 
+      price_per_week, 
+      price_per_month, 
+      price_per_year, 
+      available_from, 
+      available_until, 
+      serialNumber, 
+      req.user.id
+    ], (updateErr, result) => {
+      if (updateErr) return res.status(500).json({ msg: "Error updating item", err: updateErr });
+
+      res.status(200).json({ msg: "Item updated successfully" });
+    });
   });
 };
-
 
 
 
