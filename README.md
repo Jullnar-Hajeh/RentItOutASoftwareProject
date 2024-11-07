@@ -58,6 +58,7 @@ reduces the need for people to purchase items they only need occasionally.
    - 4- Run the application: npm start.
 
 ## API Documentation
+https://rentitout.postman.co/workspace/cca90c7f-afaa-49dc-be32-13b77471221c/documentation/38698558-0e9de600-090d-4cd6-b235-e4ff4c3d41d6
 
 ## Vision
 The vision for the RentItOut API is to facilitate a sustainable sharing economy where users can easily rent everyday items they seldom use. We aim to enhance resource sharing, reduce waste, and create a seamless rental experience that prioritizes user engagement and security. Through innovative features and loyalty incentives, we empower users to make informed decisions, fostering a community that values convenience and sustainability.
